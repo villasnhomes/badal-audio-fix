@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Badal Audio Fix</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --panel: #0f1318;
+    --border: #1e2d1e;
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --green-glow: rgba(0,255,65,0.15);
+    --amber: #ffb700;
+    --amber-dim: #996e00;
+    --red: #ff3a3a;
+    --cyan: #00e5ff;
+    --text: #c8f0c8;
+    --text-dim: #5a7a5a;
+    --accent-bg: #0d1a0d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,65,0.015) 2px,
+      rgba(0,255,65,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Header */
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(90deg, #0a120a, #0a0c0f);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), var(--green-dim), transparent);
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--green);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 12px var(--green-glow), inset 0 0 12px rgba(0,255,65,0.05);
+    animation: pulse-border 3s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 8px var(--green-glow), inset 0 0 8px rgba(0,255,65,0.05); }
+    50% { box-shadow: 0 0 20px rgba(0,255,65,0.4), inset 0 0 16px rgba(0,255,65,0.1); }
+  }
+
+  .logo-text h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 10px rgba(0,255,65,0.5);
+    letter-spacing: 2px;
+  }
+
+  .logo-text span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+  }
+
+  .header-status {
+    margin-left: auto;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  .dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dot.off { background: #333; box-shadow: none; animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 73px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: var(--panel);
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 2px; }
+
+  .section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--green-dim);
+    padding: 16px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    margin: 16px;
+    border: 1px dashed var(--green-dim);
+    border-radius: 4px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    background: var(--accent-bg);
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--green);
+    background: var(--green-glow);
+    box-shadow: 0 0 16px rgba(0,255,65,0.1);
+  }
+
+  .upload-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+
+  .upload-zone p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .upload-zone p strong {
+    color: var(--green);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  .manual-info {
+    margin: 0 16px 16px;
+    padding: 12px;
+    background: rgba(0,255,65,0.05);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    display: none;
+  }
+
+  .manual-info.active { display: block; }
+
+  .manual-info .manual-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .manual-info .manual-meta {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .progress-bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  /* Issue input */
+  .issue-box {
+    margin: 0 16px 12px;
+  }
+
+  .issue-box label {
+    display: block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--green-dim);
+    margin-bottom: 6px;
+  }
+
+  .issue-box textarea {
+    width: 100%;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 90px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .issue-box textarea:focus {
+    border-color: var(--green-dim);
+    box-shadow: 0 0 8px rgba(0,255,65,0.1);
+  }
+
+  .issue-box textarea::placeholder { color: var(--text-dim); }
+
+  /* API Key input */
+  .api-box {
+    margin: 0 16px 12px;
+  }
+
+  .api-box label {
+    display: block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--amber-dim);
+    margin-bottom: 6px;
+  }
+
+  .api-box input {
+    width: 100%;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .api-box input:focus { border-color: var(--amber-dim); }
+
+  /* Buttons */
+  .btn {
+    display: block;
+    width: calc(100% - 32px);
+    margin: 0 16px 10px;
+    padding: 11px;
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    background: var(--green-glow);
+    border-color: var(--green);
+    box-shadow: 0 0 12px rgba(0,255,65,0.2);
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn.amber {
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+  .btn.amber:hover {
+    background: rgba(255,183,0,0.1);
+    border-color: var(--amber);
+    box-shadow: 0 0 12px rgba(255,183,0,0.2);
+  }
+
+  .btn.small {
+    width: auto;
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 10px;
+    display: inline-block;
+  }
+
+  /* Component finder */
+  .comp-finder {
+    margin: 0 16px 16px;
+    padding: 12px;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .comp-finder label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--cyan);
+    display: block;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .comp-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .comp-finder input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 6px 8px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+
+  .comp-finder input:focus { border-color: rgba(0,229,255,0.4); }
+
+  .btn-cyan {
+    border-color: rgba(0,229,255,0.4);
+    color: var(--cyan);
+    background: transparent;
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-style: solid;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .btn-cyan:hover {
+    background: rgba(0,229,255,0.1);
+    border-color: var(--cyan);
+  }
+
+  /* Quick actions */
+  .quick-btns {
+    padding: 8px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .quick-btn {
+    padding: 8px 12px;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .quick-btn:hover {
+    border-color: var(--green-dim);
+    color: var(--text);
+    background: var(--green-glow);
+  }
+
+  .quick-btn .qicon { font-size: 14px; }
+
+  /* Main panel */
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Tab bar */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 12px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+    background: rgba(0,255,65,0.04);
+  }
+
+  /* Chat area */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb { background: var(--green-dim); border-radius: 2px; }
+
+  /* Messages */
+  .msg {
+    max-width: 85%;
+    animation: fadeSlideIn 0.3s ease;
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.system { align-self: flex-start; }
+  .msg.user { align-self: flex-end; }
+
+  .msg-header {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .msg-header .tag {
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  .tag.badal { background: rgba(0,255,65,0.15); color: var(--green); border: 1px solid var(--green-dim); }
+  .tag.user-tag { background: rgba(255,183,0,0.1); color: var(--amber); border: 1px solid var(--amber-dim); }
+
+  .msg-body {
+    padding: 14px 16px;
+    border-radius: 4px;
+    line-height: 1.7;
+    font-size: 13.5px;
+  }
+
+  .msg.system .msg-body {
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    color: var(--text);
+  }
+
+  .msg.user .msg-body {
+    background: rgba(255,183,0,0.06);
+    border: 1px solid var(--amber-dim);
+    color: var(--text);
+  }
+
+  /* Step cards */
+  .step-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+
+  .step-card-header {
+    padding: 10px 14px;
+    background: rgba(0,255,65,0.07);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .step-num {
+    width: 22px; height: 22px;
+    border: 1px solid var(--green);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .step-body {
+    padding: 14px;
+  }
+
+  .tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+
+  .tool-badge.multimeter {
+    background: rgba(255,183,0,0.1);
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+  }
+
+  .tool-badge.oscilloscope {
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.3);
+    color: var(--cyan);
+  }
+
+  .meter-display {
+    background: #030a03;
+    border: 1px solid #1a2a1a;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+
+  .meter-setting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .meter-label { color: var(--text-dim); font-size: 10px; width: 80px; }
+  .meter-value { color: var(--green); }
+
+  .symbol-dc {
+    display: inline-block;
+    border: 1px solid var(--green);
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+    color: var(--green);
+    margin-left: 4px;
+  }
+
+  .probe-guide {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 3px;
+    border: 1px dashed #1e2d1e;
+  }
+
+  .probe-row { margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .probe-black { color: #888; font-weight: 700; }
+  .probe-red { color: var(--red); font-weight: 700; }
+
+  .expected-value {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(0,255,65,0.05);
+    border-radius: 3px;
+    border-left: 3px solid var(--green);
+  }
+
+  .expected-value .ev-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .expected-value .ev-range {
+    font-family: 'Orbitron', monospace;
+    font-size: 15px;
+    color: var(--green);
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  .component-ref {
+    display: inline-block;
+    background: rgba(0,255,65,0.08);
+    border: 1px solid var(--green-dim);
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  /* Result buttons */
+  .result-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .r-btn {
+    flex: 1;
+    padding: 9px;
+    border-radius: 4px;
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.2s;
+  }
+
+  .r-btn.ok {
+    border-color: var(--green-dim);
+    color: var(--green);
+    background: transparent;
+  }
+  .r-btn.ok:hover { background: rgba(0,255,65,0.1); }
+
+  .r-btn.fail {
+    border-color: var(--red);
+    color: var(--red);
+    background: transparent;
+  }
+  .r-btn.fail:hover { background: rgba(255,58,58,0.1); }
+
+  /* Input row */
+  .input-row {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .input-row textarea {
+    flex: 1;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    padding: 10px 12px;
+    resize: none;
+    min-height: 44px;
+    max-height: 120px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+
+  .input-row textarea:focus {
+    border-color: var(--green-dim);
+    box-shadow: 0 0 8px rgba(0,255,65,0.08);
+  }
+
+  .input-row textarea::placeholder { color: var(--text-dim); }
+
+  .send-btn {
+    padding: 10px 18px;
+    background: rgba(0,255,65,0.08);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    color: var(--green);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    height: 44px;
+  }
+
+  .send-btn:hover {
+    background: rgba(0,255,65,0.15);
+    border-color: var(--green);
+    box-shadow: 0 0 10px rgba(0,255,65,0.2);
+  }
+
+  /* Tab panels */
+  .tab-panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-panel.active { display: flex; }
+
+  /* Component finder result */
+  .alt-result {
+    margin: 16px;
+    padding: 16px;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: none;
+    animation: fadeSlideIn 0.3s ease;
+  }
+
+  .alt-result.show { display: block; }
+
+  .alt-result h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .alt-component {
+    padding: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+
+  .alt-component .alt-name {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .alt-component .alt-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* Info panel */
+  .info-panel {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .info-card {
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .info-card h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--green);
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .info-item {
+    padding: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .info-item .ii-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .info-item .ii-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--amber);
+    font-weight: 700;
+  }
+
+  /* Multimeter visual */
+  .meter-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+
+  .meter-screen {
+    width: 160px;
+    height: 70px;
+    background: #0a1a0a;
+    border: 2px solid #1a3a1a;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    color: var(--green);
+    text-shadow: 0 0 8px var(--green);
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .meter-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 4px,
+      rgba(0,0,0,0.15) 4px,
+      rgba(0,0,0,0.15) 5px
+    );
+  }
+
+  .meter-range-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  /* Loading animation */
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--accent-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    max-width: 85%;
+  }
+
+  .dots span {
+    display: inline-block;
+    animation: dotBounce 1.4s infinite ease-in-out;
+    color: var(--green);
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* Welcome screen */
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .welcome-icon { font-size: 48px; margin-bottom: 16px; }
+
+  .welcome h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: 0 0 10px rgba(0,255,65,0.3);
+    margin-bottom: 10px;
+  }
+
+  .welcome p {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.7;
+    max-width: 500px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .welcome .hint {
+    margin-top: 24px;
+    padding: 12px 20px;
+    background: var(--accent-bg);
+    border: 1px dashed var(--green-dim);
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--green-dim);
+    line-height: 1.6;
+  }
+
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo-icon">🔧</div>
+  <div class="logo-text">
+    <h1>BADAL AUDIO FIX</h1>
+    <span>VINTAGE AUDIO REPAIR ASSISTANT</span>
+  </div>
+  <div class="header-status">
+    <div class="status-dot"><div class="dot" id="aiStatusDot"></div><span id="aiStatusText">AI READY</span></div>
+    <div class="status-dot"><div class="dot off" id="manualDot"></div><span id="manualStatusText">NO MANUAL</span></div>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="section-title">📋 Service Manual</div>
+
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="pdfUpload" accept=".pdf" />
+      <div class="upload-icon">📄</div>
+      <p>
+        <strong>DROP SERVICE MANUAL HERE</strong>
+        Click to browse or drag & drop<br>
+        Supports: PDF service manuals<br>
+        (schematics, block diagrams)
+      </p>
+    </div>
+
+    <div class="manual-info" id="manualInfo">
+      <div class="manual-name" id="manualName">—</div>
+      <div class="manual-meta" id="manualMeta">—</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="section-title">🔴 Describe the Issue</div>
+
+    <div class="issue-box">
+      <label>FAULT DESCRIPTION</label>
+      <textarea id="issueInput" placeholder="e.g. No sound from left speaker, Power LED is on but unit doesn't respond, Cassette deck motor not spinning..."></textarea>
+    </div>
+
+    <button class="btn" onclick="startDiagnosis()">⚡ START DIAGNOSIS</button>
+    <button class="btn" onclick="clearSession()" style="border-color:#333; color:var(--text-dim); font-size:10px; padding:7px; margin-top:-4px">🗑️ CLEAR SESSION</button>
+
+    <hr>
+    <div class="section-title">🔍 Component Alternative Finder</div>
+
+    <div class="comp-finder">
+      <label>ENTER COMPONENT VALUE / PART NO.</label>
+      <div class="comp-row">
+        <input type="text" id="compInput" placeholder="e.g. 2SC1815, 47µF 50V, 2.2kΩ" />
+        <button class="btn-cyan" onclick="findAlternative()">FIND ALT</button>
+      </div>
+      <div style="font-family: 'Share Tech Mono'; font-size: 10px; color: var(--text-dim);">
+        Works for transistors, capacitors, ICs, resistors
+      </div>
+    </div>
+
+    <div class="alt-result" id="altResult"></div>
+
+    <hr>
+    <div class="section-title">⚡ Quick Guides</div>
+
+    <div class="quick-btns">
+      <button class="quick-btn" onclick="sendQuick('How do I test a transistor with a multimeter?')"><span class="qicon">🔬</span> Test a Transistor</button>
+      <button class="quick-btn" onclick="sendQuick('How do I test an electrolytic capacitor?')"><span class="qicon">⚡</span> Test a Capacitor</button>
+      <button class="quick-btn" onclick="sendQuick('How do I use an oscilloscope to check audio signal?')"><span class="qicon">📡</span> Oscilloscope Basics</button>
+      <button class="quick-btn" onclick="sendQuick('How do I read a schematic diagram for a Sony MHC system?')"><span class="qicon">📐</span> Read Schematics</button>
+      <button class="quick-btn" onclick="sendQuick('How to check power supply voltages on a Sony MHC?')"><span class="qicon">🔋</span> Check Power Supply</button>
+      <button class="quick-btn" onclick="sendQuick('What are the common fault areas in Sony MHC systems?')"><span class="qicon">🛠️</span> Common Sony Faults</button>
+    </div>
+
+    <hr>
+    <div class="section-title">🔑 Gemini API Key</div>
+    <div class="api-box">
+      <label>GOOGLE AI STUDIO KEY</label>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="password" id="apiKeyInput" placeholder="Paste your AIza... key here" style="flex:1"/>
+        <button onclick="toggleKeyVisibility()" id="eyeBtn" style="background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);padding:6px 8px;cursor:pointer;font-size:13px;flex-shrink:0;">👁</button>
+      </div>
+      <div style="margin-top:6px; font-family:'Share Tech Mono'; font-size:10px; color:var(--text-dim); line-height:1.6;">
+        Get free key at:<br>
+        <span style="color:var(--amber)">aistudio.google.com/apikey</span><br>
+        Key is saved in your browser only.
+      </div>
+    </div>
+
+    <div style="display:flex; gap:6px; margin: 0 16px 6px;">
+      <button class="btn amber" onclick="saveApiKey()" style="margin:0; flex:1; padding:9px;">💾 SAVE</button>
+      <button class="btn amber" onclick="testConnection()" id="testBtn" style="margin:0; flex:1; padding:9px; border-color:#555; color:var(--text-dim);">🔌 TEST</button>
+    </div>
+
+    <!-- Connection status box -->
+    <div id="connStatus" style="display:none; margin:0 16px 12px; padding:10px 12px; border-radius:4px; font-family:'Share Tech Mono'; font-size:11px; line-height:1.6;"></div>
+
+    <!-- First time setup guide -->
+    <div id="setupGuide" style="margin:0 16px 16px; padding:12px; background:rgba(255,183,0,0.05); border:1px solid var(--amber-dim); border-radius:4px; font-family:'Share Tech Mono'; font-size:10px; color:var(--text-dim); line-height:1.8;">
+      <div style="color:var(--amber); font-weight:700; margin-bottom:6px; letter-spacing:1px;">⚡ FIRST TIME SETUP</div>
+      1. Go to <span style="color:var(--amber)">aistudio.google.com</span><br>
+      2. Sign in with Google account<br>
+      3. Click <span style="color:var(--green)">"Get API Key"</span><br>
+      4. Click <span style="color:var(--green)">"Create API Key"</span><br>
+      5. Copy the key (starts with AIza...)<br>
+      6. Paste above → Save → Test Connection
+    </div>
+
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel">
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('diagnosis')">🔴 DIAGNOSIS</div>
+      <div class="tab" onclick="switchTab('tools')">🔧 TOOL REFERENCE</div>
+      <div class="tab" onclick="switchTab('symbols')">📊 METER SYMBOLS</div>
+    </div>
+
+    <!-- DIAGNOSIS TAB -->
+    <div class="tab-panel active" id="tab-diagnosis">
+      <div class="chat-area" id="chatArea">
+        <div class="welcome">
+          <div class="welcome-icon">🎛️</div>
+          <h2>WELCOME TO BADAL AUDIO FIX</h2>
+          <p>Your personal step-by-step audio repair mentor for Sony MHC, amplifiers, cassette decks & more. Upload a service manual, describe your fault, and get guided through the repair process — one component at a time.</p>
+          <div class="hint">
+            TIP: Upload the PDF service manual → Describe the fault → Get a step-by-step guided diagnosis with tool settings and expected readings.
+          </div>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <textarea id="chatInput" placeholder="Ask anything about your repair... (Press Enter to send, Shift+Enter for new line)" rows="1" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" onclick="sendMessage()">SEND ▶</button>
+      </div>
+    </div>
+
+    <!-- TOOL REFERENCE TAB -->
+    <div class="tab-panel" id="tab-tools">
+      <div class="info-panel">
+
+        <div class="meter-visual">
+          <div class="meter-screen" id="meterScreen">12.4</div>
+          <div class="meter-range-display" id="meterRangeDisplay">DC VOLTAGE — 20V RANGE</div>
+        </div>
+
+        <div class="info-card">
+          <h3>⚡ Multimeter — DC Voltage Mode</h3>
+          <div class="info-grid">
+            <div class="info-item"><div class="ii-label">Symbol</div><div class="ii-value" style="font-size:20px; letter-spacing: 1px; color:var(--green)">V<span style="font-size:14px">⎓</span></div></div>
+            <div class="info-item"><div class="ii-label">Range for 12V rail</div><div class="ii-value">20V</div></div>
+            <div class="info-item"><div class="ii-label">Black Probe</div><div class="ii-value" style="color:#888">GND (COM)</div></div>
+            <div class="info-item"><div class="ii-label">Red Probe</div><div class="ii-value" style="color:var(--red)">Test Point</div></div>
+          </div>
+          <div style="margin-top:12px; font-family:'Share Tech Mono'; font-size:11px; color:var(--text-dim); line-height:1.7">
+            Always set range HIGHER than expected value.<br>
+            For Sony MHC: 12V rail → use 20V range<br>
+            5V rail → use 20V range<br>
+            Low voltage signal → use 2V or 200mV range
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>〜 Multimeter — AC Voltage Mode</h3>
+          <div class="info-grid">
+            <div class="info-item"><div class="ii-label">Symbol</div><div class="ii-value" style="font-size:20px; color:var(--cyan)">V<span style="font-size:14px">~</span></div></div>
+            <div class="info-item"><div class="ii-label">Range for mains</div><div class="ii-value" style="color:var(--cyan)">750V AC</div></div>
+            <div class="info-item"><div class="ii-label">Range for output</div><div class="ii-value" style="color:var(--cyan)">2V AC</div></div>
+            <div class="info-item"><div class="ii-label">Note</div><div class="ii-value" style="font-size:10px; color:var(--amber)">CAUTION!</div></div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>🔊 Resistance / Continuity Mode</h3>
+          <div class="info-grid">
+            <div class="info-item"><div class="ii-label">Symbol (Ohm)</div><div class="ii-value" style="font-size:20px">Ω</div></div>
+            <div class="info-item"><div class="ii-label">Continuity</div><div class="ii-value" style="font-size:18px">🔔</div></div>
+            <div class="info-item"><div class="ii-label">Speaker check</div><div class="ii-value">4–8 Ω</div></div>
+            <div class="info-item"><div class="ii-label">Coil check</div><div class="ii-value">200 Ω</div></div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>📡 Oscilloscope Settings for Audio</h3>
+          <div style="font-family:'Share Tech Mono'; font-size:11px; color:var(--text-dim); line-height:1.8">
+            <span style="color:var(--cyan)">VOLTS/DIV:</span> 500mV for line-level audio signal<br>
+            <span style="color:var(--cyan)">TIME/DIV:</span> 1ms for 1kHz test tone<br>
+            <span style="color:var(--cyan)">COUPLING:</span> AC mode for audio signals<br>
+            <span style="color:var(--cyan)">TRIGGER:</span> Auto, rising edge<br>
+            <span style="color:var(--cyan)">PROBE:</span> 1x setting for low-voltage audio
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SYMBOLS TAB -->
+    <div class="tab-panel" id="tab-symbols">
+      <div class="info-panel">
+        <div class="info-card">
+          <h3>📊 Multimeter Display Symbols Explained</h3>
+          <div style="display:grid; gap:10px; margin-top:4px">
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:24px; color:var(--green); width:60px; text-align:center">⎓</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--green); margin-bottom:2px">DC (Direct Current)</div><div style="font-size:12px; color:var(--text-dim)">Solid line with dashes below. Used for battery, power supply voltages (12V, 5V rails)</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:24px; color:var(--cyan); width:60px; text-align:center">~</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--cyan); margin-bottom:2px">AC (Alternating Current)</div><div style="font-size:12px; color:var(--text-dim)">Wavy line. Used for mains power testing and audio output signals</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:24px; color:var(--amber); width:60px; text-align:center">Ω</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--amber); margin-bottom:2px">RESISTANCE (Ohms)</div><div style="font-size:12px; color:var(--text-dim)">Used to measure resistors, speaker coils, check for shorts</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:24px; color:var(--red); width:60px; text-align:center">🔔</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--red); margin-bottom:2px">CONTINUITY BEEP</div><div style="font-size:12px; color:var(--text-dim)">Beeps when circuit is complete. Use for tracing PCB tracks and checking fuses</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:24px; color:var(--green); width:60px; text-align:center">hFE</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--green); margin-bottom:2px">TRANSISTOR hFE (Gain)</div><div style="font-size:12px; color:var(--text-dim)">Measures transistor gain. Insert transistor in hFE socket (B, C, E pins). Typical: 100–400</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:18px; color:var(--cyan); width:60px; text-align:center">⊣⊢</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--cyan); margin-bottom:2px">DIODE TEST</div><div style="font-size:12px; color:var(--text-dim)">Forward voltage of diode. Silicon: 0.5–0.7V. Use to test diodes and transistor junctions</div></div>
+            </div>
+            <div class="info-item" style="display:flex; align-items:center; gap:12px">
+              <div style="font-family:'Orbitron'; font-size:18px; color:var(--amber); width:60px; text-align:center">F / µF</div>
+              <div><div style="font-family:'Share Tech Mono'; font-size:10px; color:var(--amber); margin-bottom:2px">CAPACITANCE</div><div style="font-size:12px; color:var(--text-dim)">Measures capacitor value. Compare with marked value ±20%. If off, capacitor is bad</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <h3>🔌 Probe Placement Rules</h3>
+          <div style="font-family:'Share Tech Mono'; font-size:11px; line-height:2; color:var(--text-dim)">
+            <div><span style="color:#888; font-weight:700">⬛ BLACK probe</span> → Always to GROUND (chassis, negative terminal, GND point on PCB)</div>
+            <div><span style="color:var(--red); font-weight:700">🟥 RED probe</span> → To the point you are measuring (emitter, collector, test point)</div>
+            <div style="margin-top:8px; color:var(--green)">⚠️ NEVER reverse probes when measuring DC voltage. Negative reading means reversed polarity!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────
+  let apiKey = localStorage.getItem('baf_api_key') || '';
+  let manualText = '';
+  let manualLoaded = false;
+  let conversationHistory = [];
+  let isThinking = false;
+
+  if (apiKey) {
+    document.getElementById('apiKeyInput').value = apiKey;
+    const guide = document.getElementById('setupGuide');
+    if (guide) guide.style.display = 'none';
+  }
+
+  // ─── API Key ─────────────────────────────────────────
+  function clearSession() {
+    conversationHistory = [];
+    window.manualInjected = false;
+    const chat = document.getElementById('chatArea');
+    chat.innerHTML = `<div class="welcome">
+      <div class="welcome-icon">🎛️</div>
+      <h2>SESSION CLEARED</h2>
+      <p>Ready for a new repair session. Describe your fault and click START DIAGNOSIS.</p>
+    </div>`;
+    showToast('Session cleared!');
+  }
+
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) { showToast('Please paste your API key first!'); return; }
+    if (!val.startsWith('AIza')) { showToast('⚠️ Key should start with AIza...'); return; }
+    apiKey = val;
+    localStorage.setItem('baf_api_key', apiKey);
+    updateAiStatus(true);
+    showConnStatus('saved', '✅ Key saved! Click TEST to verify it works.');
+    // Hide setup guide once key is saved
+    const guide = document.getElementById('setupGuide');
+    if (guide) guide.style.display = 'none';
+  }
+
+  function toggleKeyVisibility() {
+    const input = document.getElementById('apiKeyInput');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  async function testConnection() {
+    if (!apiKey) { showToast('Save your API key first!'); return; }
+    const btn = document.getElementById('testBtn');
+    btn.textContent = '⏳ TESTING...';
+    btn.disabled = true;
+    showConnStatus('testing', '🔍 Connecting to Gemini API...');
+
+    try {
+      const body = {
+        system_instruction: { parts: [{ text: 'You are a helpful assistant.' }] },
+        contents: [{ role: 'user', parts: [{ text: 'Reply with exactly three words: Connection test successful.' }] }],
+        generationConfig: { maxOutputTokens: 20, temperature: 0 }
+      };
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+
+      const data = await response.json();
+
+      if (data.error) {
+        const code = data.error.code;
+        let hint = '';
+        if (code === 400) hint = 'Bad request — key may be malformed.';
+        else if (code === 401 || code === 403) hint = 'Invalid or unauthorized key. Please check it at aistudio.google.com/apikey';
+        else if (code === 429) hint = 'Rate limit hit. Wait a minute and try again.';
+        else hint = data.error.message;
+        showConnStatus('error', `❌ Error ${code}: ${hint}`);
+        updateAiStatus(false);
+      } else {
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        showConnStatus('ok', `✅ CONNECTED! Gemini replied: "${reply.trim()}"\n\nYour app is ready to use!`);
+        updateAiStatus(true);
+      }
+    } catch (err) {
+      showConnStatus('error', `❌ Network error: ${err.message}\n\nIf hosted on GitHub Pages this should not happen. If running as a local file, use a local server (VS Code Live Server or Python http.server).`);
+    }
+
+    btn.textContent = '🔌 TEST';
+    btn.disabled = false;
+  }
+
+  function showConnStatus(type, msg) {
+    const el = document.getElementById('connStatus');
+    el.style.display = 'block';
+    const colors = {
+      ok:      { bg: 'rgba(0,255,65,0.06)',  border: 'var(--green-dim)', color: 'var(--green)' },
+      error:   { bg: 'rgba(255,58,58,0.06)', border: 'var(--red)',       color: 'var(--red)' },
+      saved:   { bg: 'rgba(255,183,0,0.06)', border: 'var(--amber-dim)', color: 'var(--amber)' },
+      testing: { bg: 'rgba(0,229,255,0.04)', border: 'rgba(0,229,255,0.3)', color: 'var(--cyan)' },
+    };
+    const c = colors[type] || colors.saved;
+    el.style.cssText = `display:block; margin:0 16px 12px; padding:10px 12px; border-radius:4px; font-family:'Share Tech Mono'; font-size:11px; line-height:1.6; background:${c.bg}; border:1px solid ${c.border}; color:${c.color};`;
+    el.textContent = msg;
+  }
+
+  function updateAiStatus(ready) {
+    const dot = document.getElementById('aiStatusDot');
+    const text = document.getElementById('aiStatusText');
+    if (ready && apiKey) {
+      dot.className = 'dot';
+      text.textContent = 'AI READY';
+    } else {
+      dot.className = 'dot amber';
+      text.textContent = 'NO API KEY';
+    }
+  }
+
+  updateAiStatus(!!apiKey);
+
+  // ─── File Upload ──────────────────────────────────────
+  const uploadZone = document.getElementById('uploadZone');
+  const pdfUpload = document.getElementById('pdfUpload');
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') handlePDF(file);
+  });
+
+  pdfUpload.addEventListener('change', e => {
+    if (e.target.files[0]) handlePDF(e.target.files[0]);
+  });
+
+  async function handlePDF(file) {
+    const info = document.getElementById('manualInfo');
+    const name = document.getElementById('manualName');
+    const meta = document.getElementById('manualMeta');
+    const fill = document.getElementById('progressFill');
+    const manualDot = document.getElementById('manualDot');
+    const manualStatus = document.getElementById('manualStatusText');
+
+    name.textContent = file.name;
+    meta.textContent = 'Reading manual... please wait';
+    info.classList.add('active');
+    fill.style.width = '20%';
+
+    try {
+      // Use PDF.js via CDN to extract text
+      const arrayBuffer = await file.arrayBuffer();
+      fill.style.width = '40%';
+
+      // We'll use a simpler approach - read as base64 and send to API
+      const base64 = await fileToBase64(file);
+      manualText = `[SERVICE MANUAL UPLOADED: ${file.name}]\n[PDF base64 data available for AI analysis]\n[File size: ${(file.size/1024).toFixed(0)} KB]`;
+      
+      // Store base64 for API calls
+      window.manualBase64 = base64;
+      window.manualFileName = file.name;
+      window.manualInjected = false; // reset so new manual gets sent to AI
+      
+      fill.style.width = '100%';
+      manualLoaded = true;
+      meta.textContent = `✓ Ready | ${(file.size/1024).toFixed(0)} KB | Send to AI on diagnosis`;
+      manualDot.className = 'dot';
+      manualStatus.textContent = 'MANUAL LOADED';
+
+      addSystemMessage(`✅ Service manual loaded: **${file.name}**\n\nI have the manual ready. Now describe the fault you're experiencing and click **START DIAGNOSIS** — I'll guide you step by step through the troubleshooting process!`);
+    } catch (err) {
+      meta.textContent = '❌ Error reading file. Try again.';
+      console.error(err);
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ─── Tabs ─────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    const tabEls = document.querySelectorAll('.tab');
+    const panels = document.querySelectorAll('.tab-panel');
+    const idx = ['diagnosis','tools','symbols'].indexOf(name);
+    tabEls[idx].classList.add('active');
+    panels[idx].classList.add('active');
+  }
+
+  // ─── Chat ─────────────────────────────────────────────
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text || isThinking) return;
+    input.value = '';
+    await processMessage(text);
+  }
+
+  async function sendQuick(text) {
+    switchTab('diagnosis');
+    await processMessage(text);
+  }
+
+  async function startDiagnosis() {
+    const issue = document.getElementById('issueInput').value.trim();
+    if (!issue) { showToast('Please describe the fault first!'); return; }
+    switchTab('diagnosis');
+
+    let prompt = `I am repairing an audio system. Here is the fault I am experiencing:\n\n"${issue}"\n\nPlease guide me step by step from the very beginning of troubleshooting. For each step:\n1. Tell me which tool to use (multimeter or oscilloscope)\n2. How to set the tool (range, mode, symbols on the dial)\n3. Where to place the black probe and red probe\n4. Which component to test (with its reference number from the schematic, e.g. Q610, C205, R112)\n5. What reading I should expect (min and max values)\n6. What it means if I get a good or bad reading\n\nStart from step 1 now.`;
+    
+    await processMessage(prompt);
+  }
+
+  async function processMessage(text) {
+    if (!apiKey) { showToast('Please enter your Google AI Studio API key first!'); return; }
+    
+    addUserMessage(text);
+    const thinkingEl = addThinking();
+    isThinking = true;
+
+    try {
+      const systemPrompt = buildSystemPrompt();
+
+      // Add user message to history
+      conversationHistory.push({ role: 'user', parts: [{ text }] });
+
+      // Build contents array for multi-turn conversation
+      // If manual is loaded, inject it as first user turn (only once)
+      let contents = [];
+
+      if (window.manualBase64 && !window.manualInjected) {
+        // First ever message with manual — prepend manual as context in first user turn
+        window.manualInjected = true;
+        contents.push({
+          role: 'user',
+          parts: [
+            { text: `Here is the service manual for the unit I am repairing (${window.manualFileName}). Please read it fully and remember all component numbers, voltages, and circuit details.` },
+            { inlineData: { mimeType: 'application/pdf', data: window.manualBase64 } }
+          ]
+        });
+        contents.push({
+          role: 'model',
+          parts: [{ text: `I have read the service manual for ${window.manualFileName}. I have noted all the component reference numbers, power supply voltages, signal paths, and schematic details. I am ready to guide you through the troubleshooting. Please describe the fault you are experiencing.` }]
+        });
+      }
+
+      // Add full conversation history
+      contents = contents.concat(conversationHistory);
+
+      const body = {
+        system_instruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048
+        }
+      };
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.error) throw new Error(`API Error ${data.error.code}: ${data.error.message}`);
+
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!reply) throw new Error('Empty response from AI. Please try again.');
+
+      conversationHistory.push({ role: 'model', parts: [{ text: reply }] });
+
+      thinkingEl.remove();
+      addSystemMessage(reply);
+    } catch (err) {
+      thinkingEl.remove();
+      addSystemMessage(`❌ Error: ${err.message}\n\nCommon fixes:\n• Make sure your API key is correct\n• Check internet connection\n• Try again in a few seconds`);
+      console.error('API Error:', err);
+    }
+    
+    isThinking = false;
+  }
+
+  function buildSystemPrompt() {
+    return `You are BADAL AUDIO FIX — an expert vintage audio repair mentor and electronic technician assistant. You are helping a self-taught electronics mechanic who repairs Sony MHC systems, amplifiers, cassette decks, and other vintage audio equipment.
+
+Your role is to guide the technician through repairs in a very specific, step-by-step manner. 
+
+RULES FOR EVERY RESPONSE:
+1. Always be extremely specific about component reference numbers (e.g., Q610, C205, IC401, R112, D103)
+2. Always specify the exact tool: MULTIMETER or OSCILLOSCOPE
+3. For multimeter: always specify the exact MODE (DC Volts, AC Volts, Resistance/Ω, Diode test, Continuity/beep, hFE) and RANGE (e.g., "20V DC range")
+4. Always say where to place the BLACK probe (ground/negative) and RED probe (test point)
+5. Always give EXPECTED READING range (e.g., "11.5V to 12.5V")
+6. Tell them what a GOOD reading means vs a BAD reading
+7. Only give ONE step at a time — wait for the user to report results before giving the next step
+8. If a component is bad, tell them the exact value of the replacement needed
+9. Start EVERY troubleshooting from POWER SUPPLY first, then work signal path forward
+10. When mentioning multimeter symbols, describe them clearly: "DC Volts — look for the V with a solid line and dotted line (⎓ symbol)" or "AC Volts — look for V~ (wavy line)"
+11. Be encouraging and patient — this is a learning journey
+
+FORMAT:
+- Use STEP headers clearly
+- Put component references in [brackets] like [Q610] or [C205]  
+- Put expected readings clearly like: ✅ EXPECTED: 11.5V – 12.5V
+- Use 🔴 for fault indicators, ✅ for ok results, 🔧 for tool instructions
+- After each step, ask: "What reading are you getting?" or "Tell me your result."
+
+${window.manualFileName ? `A service manual has been uploaded: "${window.manualFileName}". Use it to reference specific component numbers and voltages from the actual schematic.` : 'No service manual uploaded yet. Give general guidance based on typical Sony MHC architecture.'}`;
+  }
+
+  // ─── UI Helpers ───────────────────────────────────────
+  function addUserMessage(text) {
+    const chat = document.getElementById('chatArea');
+    clearWelcome();
+    const el = document.createElement('div');
+    el.className = 'msg user';
+    el.innerHTML = `
+      <div class="msg-header"><span class="tag user-tag">YOU</span></div>
+      <div class="msg-body">${escHtml(text)}</div>
+    `;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function addSystemMessage(text) {
+    const chat = document.getElementById('chatArea');
+    clearWelcome();
+    const el = document.createElement('div');
+    el.className = 'msg system';
+    el.innerHTML = `
+      <div class="msg-header"><span class="tag badal">BADAL AUDIO FIX</span></div>
+      <div class="msg-body">${formatResponse(text)}</div>
+    `;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function addThinking() {
+    const chat = document.getElementById('chatArea');
+    const el = document.createElement('div');
+    el.className = 'thinking';
+    el.innerHTML = `🔍 Analyzing... <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+    return el;
+  }
+
+  function clearWelcome() {
+    const w = document.querySelector('.welcome');
+    if (w) w.remove();
+  }
+
+  function formatResponse(text) {
+    // Bold **text**
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--green)">$1</strong>');
+    // Component references [Q610]
+    text = text.replace(/\[([A-Z]{1,2}\d+)\]/g, '<span class="component-ref">$1</span>');
+    // Expected readings line
+    text = text.replace(/✅\s*EXPECTED:\s*([^\n]+)/g, `<div class="expected-value"><div class="ev-label">✅ EXPECTED READING</div><div class="ev-range">$1</div></div>`);
+    // Newlines to br
+    text = text.replace(/\n/g, '<br>');
+    // Headers STEP N
+    text = text.replace(/STEP\s+(\d+):/gi, `<br><strong style="font-family:'Orbitron'; color:var(--green); font-size:12px; letter-spacing:2px">STEP $1:</strong>`);
+    return text;
+  }
+
+  function escHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  // ─── Component Alternative Finder ────────────────────
+  async function findAlternative() {
+    const compInput = document.getElementById('compInput').value.trim();
+    if (!compInput) return;
+    if (!apiKey) { showToast('Please enter your API key first!'); return; }
+
+    const resultEl = document.getElementById('altResult');
+    resultEl.classList.add('show');
+    resultEl.innerHTML = `<div style="font-family:'Share Tech Mono'; font-size:11px; color:var(--text-dim)">🔍 Searching for alternatives to <strong style="color:var(--green)">${escHtml(compInput)}</strong>...</div>`;
+
+    try {
+      const body = {
+        system_instruction: {
+          parts: [{ text: 'You are an electronics component expert specializing in vintage audio repair (Sony, Pioneer, Technics, etc.). Always respond with valid JSON only, no markdown, no extra text.' }]
+        },
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: `For the component: "${compInput}"
+
+Provide a JSON response with this exact structure:
+{
+  "original": "component name and full specs",
+  "alternatives": [
+    {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy (Mouser/Digi-Key/AliExpress)"},
+    {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy"},
+    {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy"}
+  ],
+  "warning": "any important caution about substitution, pinout differences, voltage ratings OR null if no warning"
+}
+
+Give 3 alternatives that are easy to find today. Only output the JSON object, nothing else.`
+          }]
+        }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
+      };
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+
+      let reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Try to parse JSON
+      const jsonMatch = reply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        let html = `<h3>🔍 ALTERNATIVES FOR: <span style="color:var(--amber)">${escHtml(compInput)}</span></h3>`;
+        html += `<div style="font-family:'Share Tech Mono'; font-size:11px; color:var(--text-dim); margin-bottom:10px">${escHtml(parsed.original || '')}</div>`;
+        
+        (parsed.alternatives || []).forEach((alt, i) => {
+          html += `<div class="alt-component">
+            <div class="alt-name">${i+1}. ${escHtml(alt.part || '')}</div>
+            <div class="alt-note">${escHtml(alt.note || '')} — <span style="color:var(--cyan)">${escHtml(alt.source || '')}</span></div>
+          </div>`;
+        });
+
+        if (parsed.warning) {
+          html += `<div style="margin-top:8px; padding:8px 10px; background:rgba(255,58,58,0.05); border:1px solid rgba(255,58,58,0.3); border-radius:3px; font-family:'Share Tech Mono'; font-size:10px; color:var(--red)">⚠️ ${escHtml(parsed.warning)}</div>`;
+        }
+        resultEl.innerHTML = html;
+      } else {
+        resultEl.innerHTML = `<div style="font-family:'Share Tech Mono'; font-size:11px; color:var(--text); line-height:1.7">${reply.replace(/\n/g,'<br>')}</div>`;
+      }
+    } catch (err) {
+      resultEl.innerHTML = `<div style="color:var(--red); font-family:'Share Tech Mono'; font-size:11px">Error: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  // ─── Toast ────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--green-dim); color:var(--green); padding:10px 16px; border-radius:4px; font-family:'Share Tech Mono'; font-size:11px; z-index:10000; animation:fadeSlideIn 0.3s ease; box-shadow: 0 0 12px rgba(0,255,65,0.2);`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  // ─── Meter animation ──────────────────────────────────
+  function animateMeter() {
+    const screen = document.getElementById('meterScreen');
+    const modes = [
+      { val: '12.4', label: 'DC VOLTAGE — 20V RANGE' },
+      { val: '  OL', label: 'RESISTANCE — 2kΩ RANGE' },
+      { val: '0.65', label: 'DIODE TEST MODE' },
+      { val: ' 8.0', label: 'RESISTANCE — 20Ω (SPEAKER)' },
+      { val: '0.89', label: 'AC VOLTAGE — 2V RANGE' },
+    ];
+    let i = 0;
+    setInterval(() => {
+      i = (i + 1) % modes.length;
+      screen.textContent = modes[i].val;
+      document.getElementById('meterRangeDisplay').textContent = modes[i].label;
+    }, 3000);
+  }
+  animateMeter();
+</script>
+</body>
+</html>
