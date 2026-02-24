@@ -1541,23 +1541,14 @@
     try {
       const systemPrompt = buildSystemPrompt();
 
-      // First message with manual — inject manual summary as context
-      if (window.manualBase64 && !window.manualInjected) {
-        window.manualInjected = true;
-        conversationHistory.push({
-          role: 'user',
-          content: 'I have uploaded the service manual: ' + window.manualFileName + '. Please acknowledge and wait for my fault description.'
-        });
-        conversationHistory.push({
-          role: 'assistant',
-          content: 'Understood. I have noted the service manual for ' + window.manualFileName + '. I am ready to guide you through troubleshooting step by step. Please describe the fault you are experiencing.'
-        });
-      }
-
-      // Add current user message
+      // Add current user message to history
       conversationHistory.push({ role: 'user', content: text });
 
-      const reply = await aiCall(systemPrompt, conversationHistory);
+      // SLIDING WINDOW — only send last 6 messages (3 exchanges)
+      // This prevents token limit errors on free models
+      const recentHistory = conversationHistory.slice(-6);
+
+      const reply = await aiCall(systemPrompt, recentHistory);
 
       conversationHistory.push({ role: 'assistant', content: reply });
 
@@ -1576,31 +1567,26 @@
   }
 
   function buildSystemPrompt() {
-    return `You are BADAL AUDIO FIX — an expert vintage audio repair mentor and electronic technician assistant. You are helping a self-taught electronics mechanic who repairs Sony MHC systems, amplifiers, cassette decks, and other vintage audio equipment.
+    const manualNote = window.manualFileName
+      ? 'SERVICE MANUAL ON FILE: "' + window.manualFileName + '". Reference specific component numbers, voltage test points, and signal paths from this manual in every step.'
+      : 'No service manual uploaded. Give general guidance based on typical Sony MHC architecture.';
 
-Your role is to guide the technician through repairs in a very specific, step-by-step manner. 
-
-RULES FOR EVERY RESPONSE:
-1. Always be extremely specific about component reference numbers (e.g., Q610, C205, IC401, R112, D103)
-2. Always specify the exact tool: MULTIMETER or OSCILLOSCOPE
-3. For multimeter: always specify the exact MODE (DC Volts, AC Volts, Resistance/Ω, Diode test, Continuity/beep, hFE) and RANGE (e.g., "20V DC range")
-4. Always say where to place the BLACK probe (ground/negative) and RED probe (test point)
-5. Always give EXPECTED READING range (e.g., "11.5V to 12.5V")
-6. Tell them what a GOOD reading means vs a BAD reading
-7. Only give ONE step at a time — wait for the user to report results before giving the next step
-8. If a component is bad, tell them the exact value of the replacement needed
-9. Start EVERY troubleshooting from POWER SUPPLY first, then work signal path forward
-10. When mentioning multimeter symbols, describe them clearly: "DC Volts — look for the V with a solid line and dotted line (⎓ symbol)" or "AC Volts — look for V~ (wavy line)"
-11. Be encouraging and patient — this is a learning journey
-
-FORMAT:
-- Use STEP headers clearly
-- Put component references in [brackets] like [Q610] or [C205]  
-- Put expected readings clearly like: ✅ EXPECTED: 11.5V – 12.5V
-- Use 🔴 for fault indicators, ✅ for ok results, 🔧 for tool instructions
-- After each step, ask: "What reading are you getting?" or "Tell me your result."
-
-${window.manualFileName ? `A service manual has been uploaded: "${window.manualFileName}". Use it to reference specific component numbers and voltages from the actual schematic.` : 'No service manual uploaded yet. Give general guidance based on typical Sony MHC architecture.'}`;
+    return 'You are BADAL AUDIO FIX, an expert vintage audio repair mentor. You help a self-taught mechanic repair Sony MHC systems, amplifiers, and cassette decks. '
+      + 'Guide through repairs step by step. RULES: '
+      + '1. Always name the exact component reference (Q610, C205, IC401, R112, D103). '
+      + '2. Always specify the tool: MULTIMETER or OSCILLOSCOPE. '
+      + '3. For multimeter: specify exact MODE (DC Volts, AC Volts, Resistance, Diode, Continuity, hFE) and RANGE (e.g. 20V DC). '
+      + '4. Always say BLACK probe location and RED probe location. '
+      + '5. Always give expected reading range e.g. 11.5V to 12.5V. '
+      + '6. Explain what a good reading means and what a bad reading means. '
+      + '7. Give ONE step at a time only. Wait for the result before giving next step. '
+      + '8. If component is bad, state the exact replacement value needed. '
+      + '9. Always start from POWER SUPPLY first, then follow signal path. '
+      + '10. Describe multimeter symbols clearly e.g. DC Volts = V with solid line and dotted line below it. '
+      + '11. Be encouraging and patient. '
+      + 'FORMAT: Use STEP 1, STEP 2 headers. Write component refs like [Q610]. Write expected values like: EXPECTED: 11.5V to 12.5V. '
+      + 'After every step ask: What reading are you getting? '
+      + manualNote;
   }
 
   // ─── UI Helpers ───────────────────────────────────────
