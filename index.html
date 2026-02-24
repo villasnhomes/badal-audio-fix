@@ -1320,18 +1320,11 @@
   // ─── OpenRouter API caller (FREE — works from India) ────
   const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
-  // Free models — app tries each until one works
-  const FREE_MODELS = [
-    'meta-llama/llama-3.1-8b-instruct:free',
-    'mistralai/mistral-7b-instruct:free',
-    'google/gemma-3-4b-it:free',
-    'qwen/qwen-2.5-7b-instruct:free',
-    'microsoft/phi-3-mini-128k-instruct:free'
-  ];
+  // openrouter/free automatically picks whichever free model is working right now
+  // This means we NEVER get "no endpoints" or "provider error" again
+  const OR_MODEL = 'openrouter/auto';
 
-  let workingModel = FREE_MODELS[0];
-
-  async function aiCallWithModel(model, systemPrompt, messages) {
+  async function aiCall(systemPrompt, messages) {
     const orMessages = [{ role: 'system', content: systemPrompt }];
     for (const m of messages) {
       const role = (m.role === 'assistant') ? 'assistant' : 'user';
@@ -1340,6 +1333,7 @@
                  : String(m.content);
       orMessages.push({ role: role, content: text });
     }
+
     const response = await fetch(OR_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -1348,33 +1342,29 @@
         'HTTP-Referer':  'https://villasnhomes.github.io/badal-audio-fix/',
         'X-Title':       'Badal Audio Fix'
       },
-      body: JSON.stringify({ model: model, messages: orMessages, max_tokens: 2048, temperature: 0.7 })
+      body: JSON.stringify({
+        model: OR_MODEL,
+        messages: orMessages,
+        max_tokens: 2048,
+        temperature: 0.7
+      })
     });
-    const data = await response.json();
-    if (data.error) {
-      const msg = (data.error.message || '').toLowerCase();
-      if (response.status === 401 || msg.includes('auth') || msg.includes('invalid key')) throw new Error('INVALID_KEY');
-      if (response.status === 429) throw new Error('RATE_LIMITED');
-      if (msg.includes('no endpoints') || msg.includes('not found') || msg.includes('unavailable')) throw new Error('MODEL_UNAVAILABLE');
-      throw new Error('API_ERROR:' + (data.error.message || JSON.stringify(data.error)));
-    }
-    return data.choices?.[0]?.message?.content || '';
-  }
 
-  async function aiCall(systemPrompt, messages) {
-    const modelsToTry = [workingModel, ...FREE_MODELS.filter(m => m !== workingModel)];
-    for (const model of modelsToTry) {
-      try {
-        const reply = await aiCallWithModel(model, systemPrompt, messages);
-        workingModel = model;
-        return reply;
-      } catch(e) {
-        if (e.message === 'INVALID_KEY' || e.message === 'RATE_LIMITED') throw e;
-        if (e.message === 'MODEL_UNAVAILABLE') continue;
-        throw e;
+    const data = await response.json();
+
+    if (data.error) {
+      const msg = data.error.message || JSON.stringify(data.error);
+      const status = response.status;
+      if (status === 401 || msg.toLowerCase().includes('auth') || msg.toLowerCase().includes('invalid key')) {
+        throw new Error('INVALID_KEY');
       }
+      if (status === 429) throw new Error('RATE_LIMITED');
+      throw new Error('API_ERROR:' + msg);
     }
-    throw new Error('All free models unavailable. Please try again in a minute.');
+
+    const reply = data.choices?.[0]?.message?.content || '';
+    if (!reply) throw new Error('Empty response. Please try again.');
+    return reply;
   }
 
   async function testConnection() {
