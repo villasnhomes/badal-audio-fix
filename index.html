@@ -1098,23 +1098,23 @@
     </div>
 
     <hr>
-    <div class="section-title">🔑 Gemini API Key</div>
+    <div class="section-title">🔑 Claude API Key</div>
     <div class="api-box">
-      <label>GOOGLE AI STUDIO KEY</label>
+      <label>ANTHROPIC (CLAUDE) KEY</label>
       <div style="display:flex; gap:6px; align-items:center;">
-        <input type="password" id="apiKeyInput" placeholder="Paste your AIza... key here" style="flex:1"/>
-        <button onclick="toggleKeyVisibility()" id="eyeBtn" style="background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);padding:6px 8px;cursor:pointer;font-size:13px;flex-shrink:0;">👁</button>
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="flex:1"/>
+        <button onclick="toggleKeyVisibility()" id="eyeBtn" style="background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);padding:6px 8px;cursor:pointer;font-size:13px;flex-shrink:0;">&#128065;</button>
       </div>
       <div style="margin-top:6px; font-family:'Share Tech Mono'; font-size:10px; color:var(--text-dim); line-height:1.6;">
-        Get free key at:<br>
-        <span style="color:var(--amber)">aistudio.google.com/apikey</span><br>
-        Key is saved in your browser only.
+        Get key at:<br>
+        <span style="color:var(--amber)">console.anthropic.com</span><br>
+        Key saved in your browser only.
       </div>
     </div>
 
     <div style="display:flex; gap:6px; margin: 0 16px 6px;">
-      <button class="btn amber" onclick="saveApiKey()" style="margin:0; flex:1; padding:9px;">💾 SAVE</button>
-      <button class="btn amber" onclick="testConnection()" id="testBtn" style="margin:0; flex:1; padding:9px; border-color:#555; color:var(--text-dim);">🔌 TEST</button>
+      <button class="btn amber" onclick="saveApiKey()" style="margin:0; flex:1; padding:9px;">&#128190; SAVE</button>
+      <button class="btn amber" onclick="testConnection()" id="testBtn" style="margin:0; flex:1; padding:9px; border-color:#555; color:var(--text-dim);">&#128268; TEST</button>
     </div>
 
     <!-- Connection status box -->
@@ -1122,13 +1122,14 @@
 
     <!-- First time setup guide -->
     <div id="setupGuide" style="margin:0 16px 16px; padding:12px; background:rgba(255,183,0,0.05); border:1px solid var(--amber-dim); border-radius:4px; font-family:'Share Tech Mono'; font-size:10px; color:var(--text-dim); line-height:1.8;">
-      <div style="color:var(--amber); font-weight:700; margin-bottom:6px; letter-spacing:1px;">⚡ FIRST TIME SETUP</div>
-      1. Go to <span style="color:var(--amber)">aistudio.google.com</span><br>
-      2. Sign in with Google account<br>
-      3. Click <span style="color:var(--green)">"Get API Key"</span><br>
-      4. Click <span style="color:var(--green)">"Create API Key"</span><br>
-      5. Copy the key (starts with AIza...)<br>
-      6. Paste above → Save → Test Connection
+      <div style="color:var(--amber); font-weight:700; margin-bottom:6px; letter-spacing:1px;">&#9889; FIRST TIME SETUP</div>
+      1. Go to <span style="color:var(--amber)">console.anthropic.com</span><br>
+      2. Sign up free (no credit card needed for trial)<br>
+      3. Click <span style="color:var(--green)">"API Keys"</span> in left menu<br>
+      4. Click <span style="color:var(--green)">"Create Key"</span><br>
+      5. Copy key (starts with sk-ant-...)<br>
+      6. Paste above &#8594; Save &#8594; Test Connection<br>
+      <div style="margin-top:6px; color:var(--green);">&#10003; Works perfectly from India!</div>
     </div>
 
   </div>
@@ -1301,7 +1302,7 @@
   function saveApiKey() {
     const val = document.getElementById('apiKeyInput').value.trim();
     if (!val) { showToast('Please paste your API key first!'); return; }
-    if (!val.startsWith('AIza')) { showToast('⚠️ Key should start with AIza...'); return; }
+    if (!val.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-...'); return; }
     apiKey = val;
     localStorage.setItem('baf_api_key', apiKey);
     updateAiStatus(true);
@@ -1316,144 +1317,65 @@
     input.type = input.type === 'password' ? 'text' : 'password';
   }
 
-  // ─── Smart Gemini API caller with proxy fallback ──────
-  // Tries direct first, then 2 proxy routes if blocked (India/geo-restriction fix)
-  const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  // ─── Claude API caller (Anthropic) ──────────────────
+  const CLAUDE_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+  const CLAUDE_MODEL    = 'claude-opus-4-5';
 
-  const PROXIES = [
-    null,  // 0 = direct (no proxy)
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
-  let workingProxyIndex = 0; // start with direct
-
-  async function geminiCall(body) {
-    const targetUrl = `${GEMINI_ENDPOINT}?key=${apiKey}`;
-
-    // Try from last working proxy first, then cycle through others
-    const order = [workingProxyIndex, ...PROXIES.map((_,i)=>i).filter(i=>i!==workingProxyIndex)];
-
-    let lastError = null;
-    for (const pi of order) {
-      const proxyFn = PROXIES[pi];
-      const fetchUrl = proxyFn ? proxyFn(targetUrl) : targetUrl;
-      const fetchOptions = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      };
-      // allorigins needs different approach
-      let response;
-      try {
-        if (pi === 2) {
-          // allorigins: wrap request differently
-          const aoUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-          response = await fetch(aoUrl, fetchOptions);
-        } else {
-          response = await fetch(fetchUrl, fetchOptions);
-        }
-        const data = await response.json();
-        if (data.error) {
-          const code = data.error.code;
-          if (code === 429) throw new Error(`QUOTA_EXCEEDED`);
-          if (code === 403 || code === 401) throw new Error(`INVALID_KEY`);
-          throw new Error(`API_ERROR:${code}:${data.error.message}`);
-        }
-        // Success! Remember this proxy for next time
-        workingProxyIndex = pi;
-        return data;
-      } catch(e) {
-        lastError = e;
-        // If quota or key error, don't try other proxies — it won't help
-        if (e.message === 'QUOTA_EXCEEDED' || e.message === 'INVALID_KEY') throw e;
-        // Otherwise it's a network/CORS error — try next proxy
-        continue;
-      }
+  async function claudeCall(systemPrompt, messages) {
+    const body = {
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: messages
+    };
+    const response = await fetch(CLAUDE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type':            'application/json',
+        'x-api-key':               apiKey,
+        'anthropic-version':       '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (data.error) {
+      const t = data.error.type || '';
+      if (t === 'authentication_error') throw new Error('INVALID_KEY');
+      if (t === 'rate_limit_error')     throw new Error('RATE_LIMITED');
+      throw new Error('API_ERROR:' + (data.error.message || JSON.stringify(data.error)));
     }
-    throw lastError || new Error('All connection methods failed');
+    return data.content?.[0]?.text || '';
   }
 
   async function testConnection() {
     if (!apiKey) { showToast('Save your API key first!'); return; }
     const btn = document.getElementById('testBtn');
-    btn.textContent = '⏳ TESTING...';
+    btn.textContent = 'TESTING...';
     btn.disabled = true;
-    showConnStatus('testing', '🔍 Trying direct connection...');
-
-    const body = {
-      system_instruction: { parts: [{ text: 'You are a helpful assistant.' }] },
-      contents: [{ role: 'user', parts: [{ text: 'Reply with exactly three words: Connection test successful.' }] }],
-      generationConfig: { maxOutputTokens: 20, temperature: 0 }
-    };
+    showConnStatus('testing', 'Connecting to Claude API...');
 
     try {
-      // Try direct first, show status as we go
-      const targetUrl = `${GEMINI_ENDPOINT}?key=${apiKey}`;
-      let data = null;
-      let usedMethod = 'Direct';
-
-      // Try direct
-      try {
-        const r = await fetch(targetUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        data = await r.json();
-        if (data.error && (data.error.code === 0 || !data.error.code)) throw new Error('net');
-        if (data.error) throw new Error(`err:${data.error.code}:${data.error.message}`);
-        usedMethod = 'Direct';
-      } catch(e1) {
-        if (e1.message.startsWith('err:')) {
-          const parts = e1.message.split(':');
-          const code = parseInt(parts[1]);
-          if (code === 429) {
-            showConnStatus('error', `❌ Error 429 — Quota exceeded.\n\nThis usually means:\n• Google Gemini API is geo-restricted in your region (India)\n• Trying proxy route now...`);
-          } else if (code === 401 || code === 403) {
-            showConnStatus('error', `❌ Invalid API key (Error ${code})\n\nPlease check your key at aistudio.google.com/apikey`);
-            btn.textContent = '🔌 TEST'; btn.disabled = false; return;
-          } else {
-            // Known API error — still try proxy
-          }
-        }
-        // Try corsproxy.io
-        showConnStatus('testing', '🔄 Direct blocked — trying Proxy Route 1...');
-        try {
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-          const r2 = await fetch(proxyUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-          data = await r2.json();
-          if (data.error) throw new Error(`err:${data.error.code}:${data.error.message}`);
-          usedMethod = 'Proxy (corsproxy.io)';
-          workingProxyIndex = 1;
-        } catch(e2) {
-          if (e2.message.startsWith('err:')) {
-            const code2 = parseInt(e2.message.split(':')[1]);
-            if (code2 === 429) {
-              showConnStatus('error', `❌ API Quota exceeded on your account.\n\nFix: Go to aistudio.google.com/apikey\n→ Delete current key\n→ Create brand NEW key in a NEW project\n→ Paste new key and test again\n\nIf still failing, your Google account may be flagged. Try with a completely different Google account.`);
-              btn.textContent = '🔌 TEST'; btn.disabled = false; return;
-            }
-          }
-          // Try allorigins
-          showConnStatus('testing', '🔄 Trying Proxy Route 2...');
-          try {
-            const r3 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-            data = await r3.json();
-            if (data.error) throw new Error(`err:${data.error.code}`);
-            usedMethod = 'Proxy (allorigins)';
-            workingProxyIndex = 2;
-          } catch(e3) {
-            showConnStatus('error', `❌ All connection routes failed.\n\nMost likely cause: Gemini API is geo-blocked in your region.\n\nBest solution: Use a VPN (ProtonVPN free tier works well)\n→ Connect to USA or Singapore server\n→ Then test again\n\nOr use the app inside Google AI Studio directly instead.`);
-            btn.textContent = '🔌 TEST'; btn.disabled = false; return;
-          }
-        }
-      }
-
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      showConnStatus('ok', `✅ CONNECTED via ${usedMethod}!\nGemini replied: "${reply.trim()}"\n\nYour app is fully working! Start your repair session.`);
+      const reply = await claudeCall(
+        'You are a helpful assistant.',
+        [{ role: 'user', content: 'Reply with exactly four words: Connection test successful.' }]
+      );
+      showConnStatus('ok', 'CONNECTED! Claude replied: [' + reply.trim() + '] — Your app is fully working! Start your repair session.');
       updateAiStatus(true);
-
     } catch(err) {
-      showConnStatus('error', `❌ Unexpected error: ${err.message}`);
+      if (err.message === 'INVALID_KEY') {
+        showConnStatus('error', 'Invalid API key. Go to console.anthropic.com -> API Keys -> Create a new key. Make sure you copy the full key starting with sk-ant-');
+      } else if (err.message === 'RATE_LIMITED') {
+        showConnStatus('error', 'Rate limited. Wait 30 seconds and try again.');
+      } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        showConnStatus('error', 'Network error. Check your internet connection and try again. Claude API works from India without any VPN or proxy.');
+      } else {
+        showConnStatus('error', 'Error: ' + err.message);
+      }
+      updateAiStatus(false);
     }
 
-    btn.textContent = '🔌 TEST';
+    btn.textContent = 'TEST';
     btn.disabled = false;
   }
 
@@ -1591,8 +1513,8 @@
   }
 
   async function processMessage(text) {
-    if (!apiKey) { showToast('Please enter your Google AI Studio API key first!'); return; }
-    
+    if (!apiKey) { showToast('Please enter your Claude API key first!'); return; }
+
     addUserMessage(text);
     const thinkingEl = addThinking();
     isThinking = true;
@@ -1600,62 +1522,41 @@
     try {
       const systemPrompt = buildSystemPrompt();
 
-      // Add user message to history
-      conversationHistory.push({ role: 'user', parts: [{ text }] });
-
-      // Build contents array for multi-turn conversation
-      // If manual is loaded, inject it as first user turn (only once)
-      let contents = [];
-
+      // Build Claude message array (role: user / assistant only)
+      // If manual not yet injected, add it as first user message with PDF attachment
       if (window.manualBase64 && !window.manualInjected) {
-        // First ever message with manual — prepend manual as context in first user turn
         window.manualInjected = true;
-        contents.push({
+        conversationHistory.push({
           role: 'user',
-          parts: [
-            { text: `Here is the service manual for the unit I am repairing (${window.manualFileName}). Please read it fully and remember all component numbers, voltages, and circuit details.` },
-            { inlineData: { mimeType: 'application/pdf', data: window.manualBase64 } }
+          content: [
+            { type: 'text', text: `Here is the service manual for the unit I am repairing (${window.manualFileName}). Please read it fully and remember all component reference numbers, voltages, and circuit details.` },
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: window.manualBase64 } }
           ]
         });
-        contents.push({
-          role: 'model',
-          parts: [{ text: `I have read the service manual for ${window.manualFileName}. I have noted all the component reference numbers, power supply voltages, signal paths, and schematic details. I am ready to guide you through the troubleshooting. Please describe the fault you are experiencing.` }]
+        conversationHistory.push({
+          role: 'assistant',
+          content: `I have read the full service manual for ${window.manualFileName}. I have noted all component reference numbers, power supply rail voltages, signal flow paths, and schematic details. I am ready to guide you step by step. Please describe the fault you are experiencing.`
         });
       }
 
-      // Add full conversation history
-      contents = contents.concat(conversationHistory);
+      // Add current user message
+      conversationHistory.push({ role: 'user', content: text });
 
-      const body = {
-        system_instruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048
-        }
-      };
+      const reply = await claudeCall(systemPrompt, conversationHistory);
 
-      const data = await geminiCall(body);
-
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!reply) throw new Error('Empty response from AI. Please try again.');
-
-      conversationHistory.push({ role: 'model', parts: [{ text: reply }] });
+      conversationHistory.push({ role: 'assistant', content: reply });
 
       thinkingEl.remove();
       addSystemMessage(reply);
     } catch (err) {
       thinkingEl.remove();
       let errMsg = err.message;
-      if (errMsg === 'QUOTA_EXCEEDED') errMsg = '❌ API quota exceeded.\n\nPlease create a new API key at aistudio.google.com/apikey and paste it in the key box.';
-      else if (errMsg === 'INVALID_KEY') errMsg = '❌ Invalid API key. Please check it at aistudio.google.com/apikey';
-      else errMsg = `❌ Error: ${errMsg}\n\nTry clicking TEST CONNECTION to diagnose the issue.`;
+      if (errMsg === 'INVALID_KEY')  errMsg = 'Invalid API key. Check console.anthropic.com -> API Keys.';
+      else if (errMsg === 'RATE_LIMITED') errMsg = 'Rate limited. Wait 30 seconds and try again.';
+      else errMsg = 'Error: ' + errMsg + '\n\nClick TEST button to diagnose.';
       addSystemMessage(errMsg);
-      console.error('API Error:', err);
     }
-    
+
     isThinking = false;
   }
 
@@ -1751,43 +1652,29 @@ ${window.manualFileName ? `A service manual has been uploaded: "${window.manualF
   async function findAlternative() {
     const compInput = document.getElementById('compInput').value.trim();
     if (!compInput) return;
-    if (!apiKey) { showToast('Please enter your API key first!'); return; }
+    if (!apiKey) { showToast('Please enter your Claude API key first!'); return; }
 
     const resultEl = document.getElementById('altResult');
     resultEl.classList.add('show');
     resultEl.innerHTML = `<div style="font-family:'Share Tech Mono'; font-size:11px; color:var(--text-dim)">🔍 Searching for alternatives to <strong style="color:var(--green)">${escHtml(compInput)}</strong>...</div>`;
 
     try {
-      const body = {
-        system_instruction: {
-          parts: [{ text: 'You are an electronics component expert specializing in vintage audio repair (Sony, Pioneer, Technics, etc.). Always respond with valid JSON only, no markdown, no extra text.' }]
-        },
-        contents: [{
-          role: 'user',
-          parts: [{
-            text: `For the component: "${compInput}"
+      const sysPrompt = 'You are an electronics component expert for vintage audio repair. Always respond with valid JSON only — no markdown fences, no extra text.';
+      const userMsg = `For the component: "${compInput}"
 
-Provide a JSON response with this exact structure:
+Respond with ONLY this JSON structure:
 {
   "original": "component name and full specs",
   "alternatives": [
-    {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy (Mouser/Digi-Key/AliExpress)"},
+    {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "Mouser / Digi-Key / AliExpress"},
     {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy"},
     {"part": "PART_NUMBER", "note": "why it works as replacement", "source": "where to buy"}
   ],
-  "warning": "any important caution about substitution, pinout differences, voltage ratings OR null if no warning"
+  "warning": "important caution about pinout/voltage/polarity differences, or null"
 }
+Give 3 easy-to-find modern alternatives. Output JSON only.`;
 
-Give 3 alternatives that are easy to find today. Only output the JSON object, nothing else.`
-          }]
-        }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 800 }
-      };
-
-      const data = await geminiCall(body);
-      if (data.error) throw new Error(data.error.message);
-
-      let reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      let reply = await claudeCall(sysPrompt, [{ role: 'user', content: userMsg }]);
       
       // Try to parse JSON
       const jsonMatch = reply.match(/\{[\s\S]*\}/);
